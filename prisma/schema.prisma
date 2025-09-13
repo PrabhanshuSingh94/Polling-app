@@ -1,0 +1,66 @@
+// Prisma schema for the Real-Time Polling Application
+// This file defines the database structure and relationships
+
+// Generate Prisma client for database operations
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Database configuration - uses PostgreSQL
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Database connection string from environment variables
+}
+
+// User model - represents users who can create polls and vote
+model User {
+  id           String @id @default(cuid()) // Unique identifier
+  name         String                      // User's display name
+  email        String @unique             // Unique email address
+  passwordHash String                      // Hashed password for security
+  createdAt    DateTime @default(now())   // Account creation timestamp
+  
+  // Relationships
+  polls        Poll[] // One-to-many: A user can create multiple polls
+  votes        Vote[] // One-to-many: A user can cast multiple votes
+}
+
+// Poll model - represents a poll with a question and multiple options
+model Poll {
+  id          String   @id @default(cuid()) // Unique identifier
+  question    String                        // The poll question
+  isPublished Boolean  @default(false)      // Whether the poll is visible to users
+  createdAt   DateTime @default(now())      // Poll creation timestamp
+  updatedAt   DateTime @updatedAt           // Last modification timestamp
+  
+  // Relationships
+  creatorId   String                        // Foreign key to User
+  creator     User         @relation(fields: [creatorId], references: [id]) // One-to-many: Poll belongs to one user
+  options     PollOption[] // One-to-many: A poll can have multiple options
+}
+
+// PollOption model - represents individual options within a poll
+model PollOption {
+  id     String @id @default(cuid()) // Unique identifier
+  text   String                      // The option text/description
+  
+  // Relationships
+  pollId String                      // Foreign key to Poll
+  poll   Poll   @relation(fields: [pollId], references: [id]) // Many-to-one: Option belongs to one poll
+  votes  Vote[] // One-to-many: An option can receive multiple votes
+}
+
+// Vote model - represents a user's vote for a specific poll option
+model Vote {
+  id           String @id @default(cuid()) // Unique identifier
+  createdAt    DateTime @default(now())    // Vote timestamp
+  
+  // Relationships
+  userId       String                      // Foreign key to User
+  user         User       @relation(fields: [userId], references: [id]) // Many-to-one: Vote belongs to one user
+  pollOptionId String                      // Foreign key to PollOption
+  pollOption   PollOption @relation(fields: [pollOptionId], references: [id]) // Many-to-one: Vote is for one option
+  
+  // Prevent duplicate votes - a user can only vote once per poll option
+  @@unique([userId, pollOptionId])
+}
